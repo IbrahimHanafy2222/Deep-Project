@@ -112,7 +112,7 @@ def main(size: int, out_dir: str, hf_token: str = None):
         HF_DATASET,
         split="train",
         streaming=True,
-        trust_remote_code=True,
+
         token=hf_token,
     )
 
