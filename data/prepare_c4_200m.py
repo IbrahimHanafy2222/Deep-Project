@@ -20,7 +20,9 @@ Each row in the .tsv: input<TAB>output
 import os
 import argparse
 import random
+import time
 from datasets import load_dataset
+from tqdm import tqdm
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -110,37 +112,43 @@ def main(size: int, out_dir: str, hf_token: str = None):
         HF_DATASET,
         split="train",
         streaming=True,
+        trust_remote_code=True,
         token=hf_token,
     )
 
     # ── 2. Stream, filter, collect ────────────────────────────────────────
     print(f"Streaming and filtering up to {size:,} valid samples...\n")
 
-    collected   = []
-    seen        = 0
-    filtered    = 0
+    collected = []
+    seen      = 0
+    filtered  = 0
+    start     = time.time()
 
-    for example in dataset:
-        inp = example.get("input", "").strip()
-        out = example.get("output", "").strip()
-        seen += 1
+    # tqdm bar tracks collected samples toward the target
+    with tqdm(total=size, unit="samples", desc="Collecting") as pbar:
+        for example in dataset:
+            inp = example.get("input", "").strip()
+            out = example.get("output", "").strip()
+            seen += 1
 
-        if is_valid(inp, out):
-            collected.append((inp, out))
-        else:
-            filtered += 1
+            if is_valid(inp, out):
+                collected.append((inp, out))
+                pbar.update(1)
+                pbar.set_postfix(streamed=seen, filtered=filtered)
+            else:
+                filtered += 1
 
-        # Progress update every 100k streamed
-        if seen % 100_000 == 0:
-            print(f"  Streamed: {seen:>9,} | Collected: {len(collected):>8,} | Filtered: {filtered:>8,}")
+            if len(collected) >= size:
+                break
 
-        if len(collected) >= size:
-            break
+    elapsed = time.time() - start
+    mins, secs = divmod(int(elapsed), 60)
 
-    print(f"\nDone streaming.")
+    print(f"\nDone streaming in {mins}m {secs}s")
     print(f"  Total streamed : {seen:,}")
     print(f"  Total collected: {len(collected):,}")
-    print(f"  Total filtered : {filtered:,} ({100*filtered/seen:.1f}%)\n")
+    print(f"  Total filtered : {filtered:,} ({100*filtered/seen:.1f}%)")
+    print(f"  Throughput     : {seen/elapsed:,.0f} samples/sec\n")
 
     # ── 3. Split ──────────────────────────────────────────────────────────
     train, val, test = split_data(collected, seed=SEED)
