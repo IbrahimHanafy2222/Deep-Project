@@ -147,7 +147,12 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+Project.md
+PHASE_3_LSTM_NO_ATTENTION.md
 # Environments
+
+PHASE_4_LSTM_BAHDANAU.md
+
 .env
 .envrc
 .venv

@@ -1,0 +1,41 @@
+{
+  "model": "lstm_seq2seq_bahdanau",
+  "params_M": 29.06,
+  "config": {
+    "vocab_size": 16000,
+    "emb_dim": 256,
+    "enc_hidden": 256,
+    "dec_hidden": 512,
+    "attn_dim": 256,
+    "max_len": 64,
+    "batch_size": 64,
+    "lr": 0.001,
+    "weight_decay": 1e-05,
+    "clip": 1.0,
+    "epochs": 3,
+    "tf_start": 1.0,
+    "tf_end": 0.5,
+    "log_every": 200,
+    "ckpt_every": 2000,
+    "max_train": 850000,
+    "max_val": 50000,
+    "max_test": 100000,
+    "max_val_eval": 5000,
+    "use_attention": true
+  },
+  "best_val_gleu": 0.5921598278872536,
+  "test": {
+    "greedy": {
+      "exact_match": 0.02388235294117647,
+      "gleu": 0.5992940904044674
+    },
+    "beam4": {
+      "exact_match": 0.02644705882352941,
+      "gleu": 0.6183894127634785
+    }
+  },
+  "compare_to_phase3": {
+    "EM_delta": 0.01584705882352941,
+    "GLEU_delta": 0.386492440585441
+  }
+}
