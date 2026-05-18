@@ -92,17 +92,22 @@ Total      & 1{,}000{,}000 \\
 
 % ---------------------------------------------------------------- 5
 \begin{frame}{Model 1 --- Bag-of-Words Baseline}
-\begin{itemize}
-  \item Each pair \textrightarrow{} two samples: corrupted = ungrammatical (0),
-        clean = grammatical (1).
-  \item Features: TF--IDF, unigrams + bigrams, 50k vocab (fit on train only).
-  \item Classifiers: Logistic Regression \& Linear SVM.
+TF--IDF (unigrams+bigrams, 50k vocab) + Logistic Regression / Linear SVM.
+Each pair \textrightarrow{} two samples: corrupted = 0, clean = 1.
+\vspace{0.5em}
+\begin{block}{Result: $\sim$62\,\% accuracy --- barely above 50\,\% chance}
+\small Why so weak? It is \emph{structural}, not bad tuning:
+\begin{itemize}\small
+  \item \textbf{Detector, not corrector} --- outputs one label, can never
+        produce corrected text.
+  \item \textbf{Bag-of-words discards order} --- but grammar \emph{is} order
+        (``she goes'' vs ``go she'').
+  \item \textbf{Error signal swamped} --- a 1-word error is invisible next to
+        content-word TF--IDF weights.
+  \item \textbf{No generalisation} --- only memorises lexical statistics.
 \end{itemize}
-\vspace{1em}
-\begin{block}{Result}
-$\sim$\textbf{62\,\%} detection accuracy --- barely above 50\,\% chance.\\
-Surface word statistics cannot solve GEC. \textrightarrow{} need seq2seq.
 \end{block}
+\centering \small Proves GEC needs sequence modelling + generation.
 \end{frame}
 
 % ---------------------------------------------------------------- 6
@@ -211,11 +216,54 @@ Transformer         & beam-4 & 8.05\,M  & 0.020          & \textbf{0.618} \\
 % ---------------------------------------------------------------- 11
 \begin{frame}{Behaviour by Sentence Length}
 \centering
-\includegraphics[width=0.72\textwidth]{../report/figures/length_bucketed_compare.png}
-\vspace{0.4em}
+\includegraphics[width=0.62\textwidth]{../evaluation/phase5_transformer/three_way_compare.png}
+\vspace{0.2em}
+\begin{itemize}\small
+  \item Bottleneck LSTM (blue) collapses to $\approx$0 on medium/long sentences.
+  \item Bahdanau \& Transformer stay non-zero everywhere --- attention is what
+        prevents the collapse.
+  \item \textbf{Crossover:} Transformer (green) overtakes Bahdanau (orange) on
+        the \emph{long} bucket --- its $O(1)$ path helps most there.
+\end{itemize}
+\end{frame}
 
-\small All models do best on short sentences; the bottleneck LSTM degrades
-fastest as sentences get longer.
+% ---------------------------------------------------------------- worked ex
+\begin{frame}[fragile]{Worked Example --- The Three Correctors}
+\textbf{Short sentence} (insert a missing article):
+{\footnotesize
+\begin{verbatim}
+SRC : Why new record is taking so long.
+REF : Why the new record is taking so long.
+P3  : Why new record is taking so long.   LSTM  - no edit (copies)
+P4  : Why a new record is taking so long. Bahd. - inserts article "a"
+P5  : Why new record is taking so long?   Trans.- "." -> "?"
+\end{verbatim}}
+\textbf{Long, noisy sentence:}
+{\footnotesize
+\begin{verbatim}
+P3 : "...cpue to buy and/indukine stead..."  hallucinated nonsense
+P4 : copies source, corrupts the URL
+P5 : copies source, fixes "got" -> "get"     the one real fix
+\end{verbatim}}
+\centering \small LSTM collapses on long input; P4 \& P5 differ by 1--2 tokens.
+\end{frame}
+
+% ---------------------------------------------------------------- P4 vs P5
+\begin{frame}{Why Bahdanau LSTM $\approx$ Transformer}
+Test GLEU is tied at \textbf{0.618}. The Transformer \emph{matches}, not beats:
+\begin{enumerate}
+  \item \textbf{Decisive feature is shared} --- both have full source access via
+        attention (the +0.386 jump). LSTM-vs-self-attention is second-order.
+  \item \textbf{Both hit the data ceiling} --- same budget, same noisy C4\_200M
+        references \textrightarrow{} both converge to GLEU $\approx$0.62.
+  \item \textbf{Sentences are mostly short} --- the Transformer's $O(1)$ path
+        only helps on long-range deps (see the crossover).
+  \item \textbf{On hard inputs both just copy} --- outputs differ by 1--2 tokens.
+\end{enumerate}
+\begin{block}{The real win is efficiency}
+Same quality with \textbf{8.05\,M} params vs 29.06\,M ($3.6\times$ fewer) +
+faster parallel training --- it would pull ahead with more data / cleaner refs.
+\end{block}
 \end{frame}
 
 % ---------------------------------------------------------------- 12

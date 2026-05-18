@@ -15,11 +15,11 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+P5DIR = os.path.join(HERE, "..", "evaluation", "phase5_transformer")
 FIG_BAHDANAU = os.path.join(HERE, "..", "report", "figures", "attn_3.png")
-FIG_XATTN = os.path.join(HERE, "..", "evaluation", "phase5_transformer",
-                         "enc_self_attn_3.png")
-FIG_LEN = os.path.join(HERE, "..", "report", "figures",
-                       "length_bucketed_compare.png")
+FIG_XATTN = os.path.join(P5DIR, "enc_self_attn_3.png")
+FIG_CROSS = os.path.join(P5DIR, "dec_cross_attn_3.png")
+FIG_LEN = os.path.join(P5DIR, "three_way_compare.png")
 
 NAVY = RGBColor(0x1D, 0x3B, 0x6E)
 RUST = RGBColor(0xB8, 0x35, 0x0F)
@@ -146,13 +146,19 @@ box_note(s, "Model 1 detects.  Models 2-4 correct.", top=5.3, size=20)
 s = add_slide()
 title_bar(s, "Model 1 - Bag-of-Words Baseline")
 bullets(s, [
-    ("Each pair -> two samples: corrupted = ungrammatical (0), "
-     "clean = grammatical (1).", 0),
-    ("Features: TF-IDF, unigrams + bigrams, 50k vocab (fit on train only).", 0),
-    ("Classifiers: Logistic Regression and Linear SVM.", 0),
+    ("TF-IDF (unigrams+bigrams, 50k vocab) + Logistic Regression / Linear SVM. "
+     "Each pair -> corrupted = 0, clean = 1.", 0),
+    ("Result: ~62% accuracy - barely above 50% chance. Why so weak? "
+     "Structural, not bad tuning:", 0),
+    ("Detector, not corrector - outputs one label, never corrected text.", 1),
+    ("Bag-of-words discards order - but grammar IS order "
+     '("she goes" vs "go she").', 1),
+    ("Error signal swamped - a 1-word error is invisible next to "
+     "content-word weights.", 1),
+    ("No generalisation - only memorises lexical statistics.", 1),
 ])
-box_note(s, "Result: ~62% detection accuracy - barely above 50% chance. "
-            "Surface word statistics cannot solve GEC -> need seq2seq.", top=4.6)
+box_note(s, "Proves GEC needs sequence modelling and text generation - "
+            "which the next three models provide.", top=5.3, size=18)
 
 # ---------------------------------------------------------------- 6 LSTM
 s = add_slide()
@@ -221,21 +227,71 @@ box_note(s, "Beam search helps the LSTM, not the well-calibrated Transformer. "
 # ---------------------------------------------------------------- 10 attention figs
 s = add_slide()
 title_bar(s, "Attention Is Interpretable")
-if os.path.exists(FIG_BAHDANAU):
-    s.shapes.add_picture(FIG_BAHDANAU, Inches(0.7), Inches(1.6), height=Inches(4.3))
-if os.path.exists(FIG_XATTN):
-    s.shapes.add_picture(FIG_XATTN, Inches(7.0), Inches(1.6), height=Inches(4.3))
-box_note(s, "Left: Bahdanau decoder alignment.  Right: Transformer encoder "
-            "self-attention.  Bright cells = focused source token.",
-         top=6.0, size=18)
+for fig, left in [(FIG_BAHDANAU, 0.5), (FIG_XATTN, 4.7), (FIG_CROSS, 8.9)]:
+    if os.path.exists(fig):
+        s.shapes.add_picture(fig, Inches(left), Inches(1.5), height=Inches(3.7))
+box_note(s, "Bahdanau decoder alignment | Transformer encoder self-attention | "
+            "Transformer decoder cross-attention. Bahdanau and Transformer "
+            "cross-attention learn visually similar source-to-output alignments.",
+         top=5.5, size=17)
 
 # ---------------------------------------------------------------- 11 length
 s = add_slide()
 title_bar(s, "Behaviour by Sentence Length")
 if os.path.exists(FIG_LEN):
-    s.shapes.add_picture(FIG_LEN, Inches(3.0), Inches(1.5), height=Inches(4.4))
-box_note(s, "All models do best on short sentences; the bottleneck LSTM "
-            "degrades fastest as sentences get longer.", top=6.1, size=18)
+    s.shapes.add_picture(FIG_LEN, Inches(3.6), Inches(1.5), height=Inches(3.4))
+bullets(s, [
+    ("Bottleneck LSTM (blue) collapses to ~0 on medium/long sentences.", 0),
+    ("Bahdanau and Transformer stay non-zero - attention prevents the collapse.", 0),
+    ("Crossover: Transformer (green) overtakes Bahdanau (orange) on the LONG "
+     "bucket - its O(1) path helps most there.", 0),
+], top=5.1, size=18)
+
+# ---------------------------------------------------------------- 11b worked example
+s = add_slide()
+title_bar(s, "Worked Example - The Three Correctors")
+box = s.shapes.add_textbox(Inches(0.7), Inches(1.5), Inches(12.0), Inches(5.4))
+tf = box.text_frame
+tf.word_wrap = True
+lines = [
+    ("Short sentence (insert a missing article):", True),
+    ("SRC : Why new record is taking so long.", False),
+    ("REF : Why the new record is taking so long.", False),
+    ("P3  : Why new record is taking so long.    LSTM   - no edit (copies)", False),
+    ("P4  : Why a new record is taking so long.  Bahd.  - inserts article 'a'", False),
+    ("P5  : Why new record is taking so long?    Trans. - '.' -> '?'", False),
+    ("", False),
+    ("Long, noisy sentence:", True),
+    ("P3 : '...cpue to buy and/indukine stead...'  hallucinated nonsense", False),
+    ("P4 : copies source, corrupts the URL", False),
+    ("P5 : copies source, fixes 'got' -> 'get'     the one real fix", False),
+    ("", False),
+    ("LSTM collapses on long input; P4 and P5 differ by only 1-2 tokens.", True),
+]
+for i, (text, bold) in enumerate(lines):
+    p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+    p.text = text
+    p.font.bold = bold
+    p.font.size = Pt(19) if bold else Pt(16)
+    if not bold and text:
+        p.font.name = "Consolas"
+
+# ---------------------------------------------------------------- 11c why P4 ~ P5
+s = add_slide()
+title_bar(s, "Why Bahdanau LSTM ~ Transformer")
+bullets(s, [
+    ("Test GLEU is tied at 0.618. The Transformer matches, not beats:", 0),
+    ("Decisive feature is shared - both have full source access via attention "
+     "(the +0.386 jump). LSTM-vs-self-attention is second-order.", 1),
+    ("Both hit the data ceiling - same budget, same noisy C4_200M references "
+     "-> both converge to GLEU ~0.62.", 1),
+    ("Sentences are mostly short - the O(1) path only helps long-range "
+     "dependencies (see the crossover).", 1),
+    ("On hard inputs both just copy - outputs differ by 1-2 tokens.", 1),
+])
+box_note(s, "The real win is efficiency: same quality with 8.05M params vs "
+            "29.06M (3.6x fewer) + faster parallel training - it would pull "
+            "ahead with more data or cleaner references.", top=5.0, size=18)
 
 # ---------------------------------------------------------------- 12 grammar
 s = add_slide()

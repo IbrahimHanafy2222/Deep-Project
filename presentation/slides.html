@@ -93,15 +93,19 @@
 <!-- 5 -->
 <section>
   <h2>Model 1 — Bag-of-Words Baseline</h2>
-  <ul>
-    <li>Each pair → two samples: corrupted = ungrammatical (0), clean = grammatical (1).</li>
-    <li>Features: TF-IDF, unigrams + bigrams, 50k vocab (fit on train only).</li>
-    <li>Classifiers: Logistic Regression &amp; Linear SVM.</li>
-  </ul>
+  <p class="small">TF-IDF (unigrams+bigrams, 50k vocab) + Logistic Regression /
+     Linear SVM. Each pair → corrupted = 0, clean = 1.</p>
   <div class="box">
-    <b>Result:</b> ~<b>62%</b> detection accuracy — barely above 50% chance.
-    Surface word statistics cannot solve GEC → need seq2seq.
+    <b>Result: ~62% accuracy — barely above 50% chance.</b> Why so weak? It is
+    <em>structural</em>, not bad tuning:
+    <ul class="small">
+      <li><b>Detector, not corrector</b> — outputs one label, never corrected text.</li>
+      <li><b>Bag-of-words discards order</b> — but grammar <em>is</em> order ("she goes" vs "go she").</li>
+      <li><b>Error signal swamped</b> — a 1-word error is invisible next to content-word weights.</li>
+      <li><b>No generalisation</b> — only memorises lexical statistics.</li>
+    </ul>
   </div>
+  <p class="small">→ Proves GEC needs sequence modelling + generation.</p>
 </section>
 
 <!-- 6 -->
@@ -182,23 +186,65 @@
   <h2>Attention Is Interpretable</h2>
   <div class="cols">
     <div>
-      <img src="../report/figures/attn_3.png" height="340">
+      <img src="../report/figures/attn_3.png" height="300">
       <p class="small">Bahdanau decoder alignment</p>
     </div>
     <div>
-      <img src="../evaluation/phase5_transformer/enc_self_attn_3.png" height="340">
+      <img src="../evaluation/phase5_transformer/enc_self_attn_3.png" height="300">
       <p class="small">Transformer encoder self-attention</p>
     </div>
+    <div>
+      <img src="../evaluation/phase5_transformer/dec_cross_attn_3.png" height="300">
+      <p class="small">Transformer decoder cross-attention</p>
+    </div>
   </div>
-  <p class="small">Bright cells = which source token the model focuses on.</p>
+  <p class="small">Bahdanau (left) &amp; Transformer cross-attention (right) learn
+     visually similar source-to-output alignments.</p>
 </section>
 
 <!-- 11 -->
 <section>
   <h2>Behaviour by Sentence Length</h2>
-  <img src="../report/figures/length_bucketed_compare.png" height="380">
-  <p class="small">All models do best on short sentences; the bottleneck LSTM
-     degrades fastest as sentences get longer.</p>
+  <img src="../evaluation/phase5_transformer/three_way_compare.png" height="300">
+  <ul class="small">
+    <li>Bottleneck LSTM (blue) collapses to ≈0 on medium/long sentences.</li>
+    <li>Bahdanau &amp; Transformer stay non-zero — attention prevents the collapse.</li>
+    <li><b>Crossover:</b> Transformer (green) overtakes Bahdanau (orange) on the
+        <em>long</em> bucket — its O(1) path helps most there.</li>
+  </ul>
+</section>
+
+<!-- 11b worked example -->
+<section>
+  <h2>Worked Example — The Three Correctors</h2>
+  <p class="small" style="text-align:left"><b>Short sentence</b> (insert a missing article):</p>
+  <pre class="small" style="text-align:left;background:#f4f4f4;padding:8px">SRC : Why new record is taking so long.
+REF : Why the new record is taking so long.
+P3  : Why new record is taking so long.   LSTM  - no edit (copies)
+P4  : Why a new record is taking so long. Bahd. - inserts article "a"
+P5  : Why new record is taking so long?   Trans.- "." -&gt; "?"</pre>
+  <p class="small" style="text-align:left"><b>Long, noisy sentence:</b></p>
+  <pre class="small" style="text-align:left;background:#f4f4f4;padding:8px">P3 : "...cpue to buy and/indukine stead..."  hallucinated nonsense
+P4 : copies source, corrupts the URL
+P5 : copies source, fixes "got" -&gt; "get"     the one real fix</pre>
+  <p class="small">LSTM collapses on long input; P4 &amp; P5 differ by 1–2 tokens.</p>
+</section>
+
+<!-- 11c why P4 ~ P5 -->
+<section>
+  <h2>Why Bahdanau LSTM ≈ Transformer</h2>
+  <p>Test GLEU tied at <b>0.618</b>. The Transformer <em>matches</em>, not beats:</p>
+  <ol class="small">
+    <li><b>Decisive feature is shared</b> — both have full source access via
+        attention (the +0.386 jump). LSTM-vs-self-attention is second-order.</li>
+    <li><b>Both hit the data ceiling</b> — same budget, same noisy C4_200M
+        references → both converge to GLEU ≈ 0.62.</li>
+    <li><b>Sentences are mostly short</b> — the O(1) path only helps long-range
+        deps (see the crossover).</li>
+    <li><b>On hard inputs both just copy</b> — outputs differ by 1–2 tokens.</li>
+  </ol>
+  <div class="box"><b>The real win is efficiency:</b> same quality with
+    <b>8.05M</b> params vs 29.06M (3.6× fewer) + faster parallel training.</div>
 </section>
 
 <!-- 12 -->

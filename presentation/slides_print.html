@@ -14,30 +14,34 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; }
   .slide {
-    width: 13.33in; height: 7.5in; padding: 0.7in 0.9in;
+    width: 13.33in; height: 7.5in; padding: 0.6in 0.9in;
     page-break-after: always; position: relative; overflow: hidden;
   }
   .slide:last-child { page-break-after: auto; }
   h1 { color: #1d3b6e; font-size: 40px; margin-bottom: 10px; }
-  h2 { color: #1d3b6e; font-size: 32px; border-bottom: 3px solid #1d3b6e;
-       padding-bottom: 6px; margin-bottom: 22px; }
-  ul { margin: 0 0 14px 26px; }
-  li { font-size: 22px; margin-bottom: 10px; line-height: 1.35; }
-  li li { font-size: 19px; margin: 6px 0; }
-  p { font-size: 22px; margin-bottom: 12px; line-height: 1.4; }
+  h2 { color: #1d3b6e; font-size: 31px; border-bottom: 3px solid #1d3b6e;
+       padding-bottom: 6px; margin-bottom: 18px; }
+  ul, ol { margin: 0 0 12px 26px; }
+  li { font-size: 21px; margin-bottom: 8px; line-height: 1.32; }
+  li li { font-size: 18px; margin: 5px 0; }
+  p { font-size: 21px; margin-bottom: 10px; line-height: 1.38; }
   em { color: #b8350f; font-style: normal; font-weight: 600; }
   code { font-family: Consolas, monospace; font-size: 0.85em; }
+  pre { font-family: Consolas, monospace; font-size: 15px; background: #f4f4f4;
+        padding: 10px 14px; border-left: 4px solid #1d3b6e; margin: 8px 0;
+        white-space: pre-wrap; }
   .box { background: #eef2fb; border-left: 6px solid #1d3b6e;
-         padding: 14px 18px; border-radius: 4px; font-size: 21px; }
-  table { border-collapse: collapse; margin: 14px auto; font-size: 19px; }
-  th, td { border: 1px solid #c4cde0; padding: 7px 14px; text-align: left; }
+         padding: 12px 18px; border-radius: 4px; font-size: 20px; }
+  .box li { font-size: 18px; }
+  table { border-collapse: collapse; margin: 12px auto; font-size: 19px; }
+  th, td { border: 1px solid #c4cde0; padding: 6px 14px; text-align: left; }
   th { background: #1d3b6e; color: #fff; }
   .center { text-align: center; }
   .cols { display: flex; gap: 28px; }
   .cols > div { flex: 1; }
   .sub { font-size: 19px; color: #444; }
   img { background: #fff; }
-  .pagenum { position: absolute; bottom: 0.35in; right: 0.6in;
+  .pagenum { position: absolute; bottom: 0.3in; right: 0.6in;
              font-size: 14px; color: #888; }
 </style>
 </head>
@@ -65,7 +69,7 @@
     <li>Errors: tense, agreement, articles, plurals, punctuation, spelling.</li>
     <li>Output is a <b>whole new sentence</b> — a sequence-to-sequence task.</li>
   </ul>
-  <div class="pagenum">2 / 15</div>
+  <div class="pagenum">2 / 17</div>
 </div>
 
 <!-- 3 -->
@@ -90,7 +94,7 @@
       </ul>
     </div>
   </div>
-  <div class="pagenum">3 / 15</div>
+  <div class="pagenum">3 / 17</div>
 </div>
 
 <!-- 4 -->
@@ -104,22 +108,26 @@
     <tr><td>4</td><td>Transformer</td><td>Self-attention; no recurrence</td></tr>
   </table>
   <p class="center" style="margin-top:24px">Model 1 <em>detects</em>. Models 2–4 <em>correct</em>.</p>
-  <div class="pagenum">4 / 15</div>
+  <div class="pagenum">4 / 17</div>
 </div>
 
 <!-- 5 -->
 <div class="slide">
   <h2>Model 1 — Bag-of-Words Baseline</h2>
-  <ul>
-    <li>Each pair &rarr; two samples: corrupted = ungrammatical (0), clean = grammatical (1).</li>
-    <li>Features: TF-IDF, unigrams + bigrams, 50k vocab (fit on train only).</li>
-    <li>Classifiers: Logistic Regression &amp; Linear SVM.</li>
-  </ul>
+  <p class="sub">TF-IDF (unigrams+bigrams, 50k vocab) + Logistic Regression /
+     Linear SVM. Each pair &rarr; corrupted = 0, clean = 1.</p>
   <div class="box">
-    <b>Result:</b> ~<b>62%</b> detection accuracy — barely above 50% chance.
-    Surface word statistics cannot solve GEC &rarr; need seq2seq.
+    <b>Result: ~62% accuracy — barely above 50% chance.</b> Why so weak? It is
+    <em>structural</em>, not bad tuning:
+    <ul>
+      <li><b>Detector, not corrector</b> — outputs one label, never corrected text.</li>
+      <li><b>Bag-of-words discards order</b> — but grammar <em>is</em> order ("she goes" vs "go she").</li>
+      <li><b>Error signal swamped</b> — a 1-word error is invisible next to content-word weights.</li>
+      <li><b>No generalisation</b> — only memorises lexical statistics.</li>
+    </ul>
   </div>
-  <div class="pagenum">5 / 15</div>
+  <p class="sub" style="margin-top:10px">&rarr; Proves GEC needs sequence modelling + generation.</p>
+  <div class="pagenum">5 / 17</div>
 </div>
 
 <!-- 6 -->
@@ -135,7 +143,7 @@
     <b>The bottleneck:</b> after the first step the decoder never "sees" the
     source again — everything is squeezed into 512 numbers.
   </div>
-  <div class="pagenum">6 / 15</div>
+  <div class="pagenum">6 / 17</div>
 </div>
 
 <!-- 7 -->
@@ -152,7 +160,7 @@
   <div class="box">
     <b>The decisive jump:</b> GLEU 0.213 &rarr; <b>0.599</b> (+0.386). Attention matters most.
   </div>
-  <div class="pagenum">7 / 15</div>
+  <div class="pagenum">7 / 17</div>
 </div>
 
 <!-- 8 -->
@@ -168,7 +176,7 @@
     <b>Smallest &amp; strongest:</b> only <b>8.05M</b> parameters (3.6&times; fewer than
     Model 3). Best validation GLEU <b>0.613</b>.
   </div>
-  <div class="pagenum">8 / 15</div>
+  <div class="pagenum">8 / 17</div>
 </div>
 
 <!-- 9 -->
@@ -183,11 +191,11 @@
     <tr><td>Transformer</td><td>greedy</td><td>8.05M</td><td>0.022</td><td><b>0.618</b></td></tr>
     <tr><td>Transformer</td><td>beam-4</td><td>8.05M</td><td>0.020</td><td><b>0.618</b></td></tr>
   </table>
-  <ul style="margin-top:14px">
+  <ul style="margin-top:12px">
     <li>Beam search helps the LSTM, not the (well-calibrated) Transformer.</li>
     <li>Transformer ties Model 3 on GLEU with 3.6&times; fewer parameters.</li>
   </ul>
-  <div class="pagenum">9 / 15</div>
+  <div class="pagenum">9 / 17</div>
 </div>
 
 <!-- 10 -->
@@ -195,28 +203,75 @@
   <h2 style="text-align:left">Attention Is Interpretable</h2>
   <div class="cols">
     <div>
-      <img src="../report/figures/attn_3.png" style="height:3.6in">
+      <img src="../report/figures/attn_3.png" style="height:3.1in">
       <p class="sub">Bahdanau decoder alignment</p>
     </div>
     <div>
-      <img src="../evaluation/phase5_transformer/enc_self_attn_3.png" style="height:3.6in">
+      <img src="../evaluation/phase5_transformer/enc_self_attn_3.png" style="height:3.1in">
       <p class="sub">Transformer encoder self-attention</p>
     </div>
+    <div>
+      <img src="../evaluation/phase5_transformer/dec_cross_attn_3.png" style="height:3.1in">
+      <p class="sub">Transformer decoder cross-attention</p>
+    </div>
   </div>
-  <p class="sub">Bright cells = which source token the model focuses on.</p>
-  <div class="pagenum">10 / 15</div>
+  <p class="sub">Bahdanau (left) and Transformer cross-attention (right) learn
+     visually similar source-to-output alignments.</p>
+  <div class="pagenum">10 / 17</div>
 </div>
 
 <!-- 11 -->
 <div class="slide center">
   <h2 style="text-align:left">Behaviour by Sentence Length</h2>
-  <img src="../report/figures/length_bucketed_compare.png" style="height:4.2in">
-  <p class="sub">All models do best on short sentences; the bottleneck LSTM
-     degrades fastest as sentences get longer.</p>
-  <div class="pagenum">11 / 15</div>
+  <img src="../evaluation/phase5_transformer/three_way_compare.png" style="height:3.3in">
+  <ul style="text-align:left;margin-top:6px">
+    <li>Bottleneck LSTM (blue) collapses to ≈0 on medium/long sentences.</li>
+    <li>Bahdanau &amp; Transformer stay non-zero — attention prevents the collapse.</li>
+    <li><b>Crossover:</b> Transformer (green) overtakes Bahdanau (orange) on the
+        <em>long</em> bucket — its O(1) path helps most there.</li>
+  </ul>
+  <div class="pagenum">11 / 17</div>
 </div>
 
 <!-- 12 -->
+<div class="slide">
+  <h2>Worked Example — The Three Correctors</h2>
+  <p><b>Short sentence</b> (insert a missing article):</p>
+  <pre>SRC : Why new record is taking so long.
+REF : Why the new record is taking so long.
+P3  : Why new record is taking so long.    LSTM   - no edit (copies)
+P4  : Why a new record is taking so long.  Bahd.  - inserts article "a"
+P5  : Why new record is taking so long?    Trans. - "." -&gt; "?"</pre>
+  <p><b>Long, noisy sentence:</b></p>
+  <pre>P3 : "...cpue to buy and/indukine stead..."   hallucinated nonsense
+P4 : copies source, corrupts the URL
+P5 : copies source, fixes "got" -&gt; "get"      the one real fix</pre>
+  <p class="sub">LSTM collapses on long input; P4 &amp; P5 differ by only 1–2 tokens.</p>
+  <div class="pagenum">12 / 17</div>
+</div>
+
+<!-- 13 -->
+<div class="slide">
+  <h2>Why Bahdanau LSTM ≈ Transformer</h2>
+  <p>Test GLEU tied at <b>0.618</b>. The Transformer <em>matches</em>, not beats:</p>
+  <ol>
+    <li><b>Decisive feature is shared</b> — both have full source access via
+        attention (the +0.386 jump). LSTM-vs-self-attention is second-order.</li>
+    <li><b>Both hit the data ceiling</b> — same budget, same noisy C4_200M
+        references &rarr; both converge to GLEU ≈ 0.62.</li>
+    <li><b>Sentences are mostly short</b> — the O(1) path only helps long-range
+        dependencies (see the crossover).</li>
+    <li><b>On hard inputs both just copy</b> — outputs differ by 1–2 tokens.</li>
+  </ol>
+  <div class="box">
+    <b>The real win is efficiency:</b> same quality with <b>8.05M</b> params vs
+    29.06M (3.6&times; fewer) + faster parallel training — it would pull ahead
+    with more data or cleaner references.
+  </div>
+  <div class="pagenum">13 / 17</div>
+</div>
+
+<!-- 14 -->
 <div class="slide">
   <h2>Grammar-Rule Analysis of Outputs</h2>
   <p><b>Learned well</b> (local syntax):</p>
@@ -230,10 +285,10 @@
     <li>Long-range / semantic edits; rare-word spelling (hallucination).</li>
     <li>Dominant failure = <em>under-correction</em> — copying the source unchanged.</li>
   </ul>
-  <div class="pagenum">12 / 15</div>
+  <div class="pagenum">14 / 17</div>
 </div>
 
-<!-- 13 -->
+<!-- 15 -->
 <div class="slide">
   <h2>The Final Challenge — Dataset Quality</h2>
   <p>Why does <b>every</b> model score only ~2% exact match?</p>
@@ -246,10 +301,10 @@
   </div>
   <p class="sub" style="margin-top:14px">&rarr; Report GLEU / F0.5, not EM.
      Cleaner data helps more than a bigger model.</p>
-  <div class="pagenum">13 / 15</div>
+  <div class="pagenum">15 / 17</div>
 </div>
 
-<!-- 14 -->
+<!-- 16 -->
 <div class="slide">
   <h2>Conclusion</h2>
   <ul>
@@ -263,14 +318,14 @@
     <b>Key insight:</b> the binding constraint is <b>dataset quality</b>, not
     architecture — synthetic C4_200M references are often paraphrases or noise.
   </div>
-  <div class="pagenum">14 / 15</div>
+  <div class="pagenum">16 / 17</div>
 </div>
 
-<!-- 15 -->
+<!-- 17 -->
 <div class="slide center" style="display:flex;flex-direction:column;justify-content:center">
   <h1>Thank You</h1>
   <p>Questions?</p>
-  <div class="pagenum">15 / 15</div>
+  <div class="pagenum">17 / 17</div>
 </div>
 
 </body>

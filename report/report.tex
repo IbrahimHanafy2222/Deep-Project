@@ -299,9 +299,32 @@ second-moment estimates are unreliable early in training.
 \subsection{Bag-of-Words detection baseline}
 The TF--IDF classifiers separate grammatical from ungrammatical sentences with
 roughly \textbf{62\,\% accuracy} (Logistic Regression and Linear SVM within
-$\pm0.1$ point of each other, $F_1\approx0.63$). Only marginally above the
-50\,\% chance level: surface word statistics alone barely detect grammaticality,
-and the model cannot correct anything. This motivates the seq2seq models.
+$\pm0.1$ point of each other, $F_1\approx0.63$) --- only marginally above the
+50\,\% chance level. This weak result is structural, not a tuning failure:
+
+\begin{itemize}[noitemsep]
+  \item \textbf{It is a detector, not a corrector.} A classifier outputs one
+        label; it can never produce a corrected sentence. It is architecturally
+        incapable of the actual GEC task --- at best it says ``something is
+        wrong'', never \emph{what} or \emph{where}.
+  \item \textbf{Bag-of-words discards word order.} Grammaticality is largely
+        \emph{about} order (``she goes'' vs.\ ``she go'' vs.\ ``go she'').
+        TF--IDF over unigrams and bigrams sees only 1--2 token windows and
+        throws away the global structure that determines agreement and tense.
+  \item \textbf{The error signal is swamped.} Many corrupted sentences differ
+        from their clean version by a single function word (a missing article,
+        a wrong preposition). TF--IDF weighting is dominated by rare
+        \emph{content} words, so the one token that carries the error
+        contributes almost nothing to the decision.
+  \item \textbf{No generalisation to unseen errors.} The model only memorises
+        lexical statistics of the training set; a new error pattern built from
+        familiar words is invisible to it.
+\end{itemize}
+
+The 62\,\% therefore mostly reflects incidental surface cues (a rare misspelled
+token, an odd bigram) rather than grammatical understanding. The baseline's
+purpose is exactly this: to prove that GEC needs \emph{sequence modelling} and
+\emph{text generation}, which the next three models provide.
 
 \subsection{Correction models --- test set}
 Table~\ref{tab:main} reports the three correctors on the held-out test set.
@@ -354,42 +377,147 @@ Transformer 0.613 --- the Transformer is selected as the strongest model.
 \end{itemize}
 
 \subsection{Length-bucketed behaviour}
-Splitting the test set by reference length (short $\le 10$, medium $11$--$20$,
-long $>20$ tokens) shows the expected pattern: all models do best on short
-sentences, and the gap between the bottleneck LSTM and the attention models is
-widest on long sentences, where the single fixed context vector loses the most
-information. Figure~\ref{fig:lenbucket} shows the comparison.
+Figure~\ref{fig:lenbucket} splits exact match by reference length (short
+$\le 10$, medium $11$--$20$, long $>20$ tokens) for all three correctors. Three
+things stand out:
+
+\begin{itemize}[noitemsep]
+  \item The \textbf{bottleneck LSTM collapses with length}: it scores
+        $\approx$0.026 on short sentences but essentially \emph{zero} on medium
+        and long ones --- the single fixed context vector cannot carry enough
+        information once the sentence is long.
+  \item The two attention models stay non-zero in every bucket: removing the
+        bottleneck is what keeps performance from vanishing on long input.
+  \item \textbf{Bahdanau and the Transformer cross over.} Bahdanau is slightly
+        ahead on short and medium sentences, but the \textbf{Transformer
+        overtakes it on long sentences} --- exactly where its $O(1)$
+        token-to-token path length matters most. This crossover is the clearest
+        evidence that the architectures differ in \emph{where}, not \emph{how
+        much}, they help.
+\end{itemize}
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.7\textwidth]{figures/length_bucketed_compare.png}
-\caption{Length-bucketed comparison of the correction models. The bottleneck
-LSTM degrades fastest as sentences get longer.}
+\includegraphics[width=0.72\textwidth]{../evaluation/phase5_transformer/three_way_compare.png}
+\caption{Length-bucketed exact match for all three correction models. The
+bottleneck LSTM (blue) drops to near zero on medium/long sentences; the
+Transformer (green) overtakes Bahdanau (orange) on the long bucket.}
 \label{fig:lenbucket}
 \end{figure}
 
 \subsection{Attention visualisations}
-The attention weights are directly interpretable. Figure~\ref{fig:attn} shows a
-Bahdanau alignment heat-map and a Transformer encoder self-attention head:
-bright cells mark which source tokens the model focuses on while producing each
-output token. The diagonal-dominant structure confirms the models learn a
-sensible, mostly monotonic source-to-target alignment, with off-diagonal mass
-exactly where words are reordered or inserted.
+The attention weights are directly interpretable. Figure~\ref{fig:attn} shows
+three views for the same test sentence (\emph{``Why new record is taking so
+long.''}): the Bahdanau decoder alignment, the Transformer's encoder
+self-attention, and the Transformer's decoder cross-attention. Bright cells mark
+which source tokens are focused on while producing each output token.
+
+The Bahdanau and Transformer cross-attention maps (a, c) are the most directly
+comparable --- both align decoder output positions to source positions. Both are
+diagonal-dominant, confirming a sensible, mostly monotonic source-to-target
+alignment, with off-diagonal mass exactly where a word is inserted: in panel (c)
+the inserted article \texttt{\_the} draws attention onto the neighbouring
+\texttt{\_new}/\texttt{\_record} tokens. The encoder self-attention (b) instead
+shows tokens attending \emph{within} the source to build context. The key
+qualitative point: the LSTM with attention and the Transformer learn
+\emph{visually similar alignments} --- a first hint at why their scores are so
+close (Section~\ref{sec:close}).
 
 \begin{figure}[h]
 \centering
-\begin{subfigure}{0.46\textwidth}
+\begin{subfigure}{0.32\textwidth}
   \includegraphics[width=\textwidth]{figures/attn_3.png}
   \caption{Bahdanau decoder alignment.}
 \end{subfigure}\hfill
-\begin{subfigure}{0.46\textwidth}
+\begin{subfigure}{0.32\textwidth}
   \includegraphics[width=\textwidth]{../evaluation/phase5_transformer/enc_self_attn_3.png}
   \caption{Transformer encoder self-attention.}
+\end{subfigure}\hfill
+\begin{subfigure}{0.32\textwidth}
+  \includegraphics[width=\textwidth]{../evaluation/phase5_transformer/dec_cross_attn_3.png}
+  \caption{Transformer decoder cross-attention.}
 \end{subfigure}
 \caption{Attention is interpretable: each cell shows how much one token attends
-to another.}
+to another. (a) and (c) are the analogous source-to-output alignments of the
+two attention models.}
 \label{fig:attn}
 \end{figure}
+
+% ------------------------------------------------------------------
+\subsection{Worked examples: the three correctors side by side}
+Aggregate scores hide \emph{how} the models behave. Below are two test
+sentences with the source, the reference, and each model's greedy prediction.
+
+\paragraph{Example A --- a short sentence (test index 3).}
+\begin{lstlisting}
+SRC : Why new record is taking so long.
+REF : Why the new record is taking so long.   (insert the article "the")
+P3  : Why new record is taking so long.        LSTM       - no edit (copies source)
+P4  : Why a new record is taking so long.      Bahdanau   - inserts an article ("a")
+P5  : Why new record is taking so long?        Transformer- changes "." to "?"
+\end{lstlisting}
+The LSTM makes \emph{no} correction at all. Bahdanau correctly identifies that
+an article is missing and inserts one --- it picks \texttt{a} where the
+reference wants \texttt{the}, so it still scores EM\,=\,0, but the \emph{type}
+of edit is right. The Transformer makes a different, defensible edit
+(declarative $\rightarrow$ question mark). All three miss the exact reference,
+yet only the two attention models attempt a real correction.
+
+\paragraph{Example B --- a long, noisy sentence (test index 102).}
+\begin{lstlisting}
+SRC : ... you will need to come to bp.co.uk/driveindineout and got your meal
+      code for PizzaExpress full T&C is here.
+REF : ... you will need to visit bp.co.uk/driveindineout and get your meal
+      code for PizzaExpress. Full T&Cs are here ...
+P3  : ... you need to be cpue to buy and/indukine stead. However, if your
+      meal made for Pax code ...               <- hallucinated nonsense
+P4  : ... come to bp.co.uk/driveindoutout and got your meal code ...
+                                                <- copies, corrupts the URL
+P5  : ... come to bp.co.uk/driveindineout and get your meal code ...
+                                                <- copies, fixes "got" -> "get"
+\end{lstlisting}
+On a long sentence the bottleneck LSTM loses the thread entirely and
+hallucinates. Both attention models instead play it safe and largely copy the
+source --- but the Transformer lands the one genuine grammatical fix
+(\texttt{got}$\rightarrow$\texttt{get}) while Bahdanau introduces a spurious
+change to the URL. This is the \emph{typical} P4-vs-P5 difference: small, a
+token or two, not dramatic.
+
+% ------------------------------------------------------------------
+\subsection{Why the attention LSTM and the Transformer are so close}
+\label{sec:close}
+The headline test GLEU is effectively tied (0.618 for both beam-4 results), and
+the worked examples above show why the gap is small. There are four reasons:
+
+\begin{enumerate}[noitemsep]
+  \item \textbf{The decisive feature is shared.} The project's largest jump
+        (+0.386 GLEU) came from giving the decoder \emph{full access to the
+        source} via attention. \emph{Both} Model 3 and Model 4 already have
+        this. The remaining LSTM-vs-self-attention difference is a
+        second-order effect on top of the same key idea.
+  \item \textbf{Both hit the data ceiling, not their capacity ceiling.} Trained
+        on the same one-million-pair budget, the same noisy C4\_200M
+        references, and the same tokenizer, both models converge to the
+        corpus's effective GLEU ceiling ($\approx$0.62). The binding
+        constraint is reference quality (Section~\ref{sec:challenge}), not
+        architecture --- a constraint a bigger or different model cannot lift.
+  \item \textbf{C4\_200M sentences are mostly short.} The Transformer's
+        signature advantage --- an $O(1)$ path between any two tokens --- only
+        pays off when dependencies are long. Most web sentences here are short
+        enough that the LSTM's sequential path is not a real handicap.
+        Figure~\ref{fig:lenbucket} confirms this: the two models only diverge
+        in the \emph{long} bucket, where the Transformer wins.
+  \item \textbf{The worked examples agree.} On hard inputs both models fall
+        back to conservative copying; their outputs differ by only one or two
+        tokens.
+\end{enumerate}
+
+So the Transformer does not \emph{out-score} the attention LSTM here --- it
+\emph{matches} it. Its real victory is efficiency: the same quality with
+\textbf{8.05\,M parameters instead of 29.06\,M} ($3.6\times$ fewer) and far
+faster, fully parallel training. That efficiency is what would let it pull
+ahead given more data, more epochs, or a cleaner corpus --- none of which this
+project's fixed budget and noisy references provide.
 
 % =====================================================================
 \section{Grammar-Rule-Based Analysis of Outputs}
