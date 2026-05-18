@@ -1,0 +1,48 @@
+{
+  "model": "transformer_gec",
+  "params_M": 8.05,
+  "config": {
+    "vocab_size": 16000,
+    "d_model": 256,
+    "nhead": 8,
+    "num_enc_layers": 3,
+    "num_dec_layers": 3,
+    "dim_ffn": 512,
+    "dropout": 0.1,
+    "max_len": 64,
+    "batch_size": 64,
+    "lr_peak": 0.001,
+    "warmup_steps": 4000,
+    "weight_decay": 0.0001,
+    "clip": 1.0,
+    "label_smooth": 0.1,
+    "epochs": 10,
+    "log_every": 200,
+    "ckpt_every": 2000,
+    "max_train": 850000,
+    "max_val": 50000,
+    "max_test": 100000,
+    "max_val_eval": 5000,
+    "max_beam_eval": 2000
+  },
+  "best_val_gleu": 0.6131024347536063,
+  "test": {
+    "greedy": {
+      "exact_match": 0.021658823529411765,
+      "gleu": 0.6180555319717138
+    },
+    "beam4": {
+      "n_samples": 2000,
+      "exact_match": 0.02,
+      "gleu": 0.6183130064884366
+    }
+  },
+  "compare_to_phase3": {
+    "EM_delta": 0.013623529411764706,
+    "GLEU_delta": 0.4052538821526875
+  },
+  "compare_to_phase4": {
+    "EM_delta": -0.002223529411764704,
+    "GLEU_delta": 0.018761441567246462
+  }
+}
