@@ -1,0 +1,30 @@
+{
+  "model": "lstm_seq2seq_no_attention",
+  "params_M": 19.55,
+  "config": {
+    "vocab_size": 16000,
+    "emb_dim": 256,
+    "enc_hidden": 256,
+    "dec_hidden": 512,
+    "max_len": 64,
+    "batch_size": 64,
+    "lr": 0.001,
+    "weight_decay": 1e-05,
+    "clip": 1.0,
+    "epochs": 3,
+    "tf_start": 1.0,
+    "tf_end": 0.5,
+    "log_every": 200,
+    "ckpt_every": 2000,
+    "max_train": null,
+    "max_val": 5000,
+    "use_attention": false
+  },
+  "best_val_gleu": 0.21210116533509746,
+  "test": {
+    "greedy": {
+      "exact_match": 0.008035294117647059,
+      "gleu": 0.21280164981902633
+    }
+  }
+}

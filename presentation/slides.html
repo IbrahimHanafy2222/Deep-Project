@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<!--
+  CIE 555 - Project presentation (reveal.js)
+  View:        open slides.html in a browser
+  Export PDF:  open slides.html?print-pdf  then  Print -> Save as PDF
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEC on C4_200M — CIE 555</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css">
+<style>
+  .reveal h1,.reveal h2,.reveal h3{color:#1d3b6e;text-transform:none}
+  .reveal section{font-size:30px}
+  .reveal table{font-size:0.7em;margin:0 auto}
+  .reveal table th{background:#1d3b6e;color:#fff}
+  .reveal .small{font-size:0.65em}
+  .reveal .box{background:#eef2fb;border-left:5px solid #1d3b6e;
+               padding:.5em .8em;border-radius:4px;text-align:left}
+  .reveal em{color:#b8350f}
+  .reveal .cols{display:flex;gap:1.2em;align-items:center}
+  .reveal .cols>div{flex:1}
+  .reveal img{background:#fff}
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- 1 -->
+<section>
+  <h1>Grammatical Error Correction</h1>
+  <h3>on the C4_200M Dataset</h3>
+  <p class="small">Bag-of-Words → LSTM → Attention → Transformer</p>
+  <hr>
+  <p class="small">Abdullah Ahmed (202200206) &nbsp;·&nbsp; Ibrahim Hanafy (202200518)</p>
+  <p class="small">CIE 555 — Neural Networks and Deep Learning<br>
+  Instructor: Dr. Ibrahim Swelam &nbsp;·&nbsp; TAs: Aya Abdelaziz, Mahmoud Farahat</p>
+</section>
+
+<!-- 2 -->
+<section>
+  <h2>The Problem: GEC</h2>
+  <p>Rewrite an ungrammatical sentence into its corrected form.</p>
+  <div class="box">
+    <b>Input (corrupted):</b> <em>"She go to school yesterday and learning many thing."</em><br><br>
+    <b>Output (corrected):</b> <em>"She went to school yesterday and learned many things."</em>
+  </div>
+  <ul>
+    <li>Errors: tense, agreement, articles, plurals, punctuation, spelling.</li>
+    <li>Output is a <b>whole new sentence</b> — a sequence-to-sequence task.</li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section>
+  <h2>The Data: C4_200M Subset</h2>
+  <p>Clean web text automatically corrupted into <code>(corrupted, clean)</code> pairs.</p>
+  <div class="cols">
+    <div>
+      <table>
+        <tr><th>Split</th><th>Pairs</th></tr>
+        <tr><td>Train</td><td>850,000</td></tr>
+        <tr><td>Validation</td><td>50,000</td></tr>
+        <tr><td>Test</td><td>100,000</td></tr>
+        <tr><td><b>Total</b></td><td><b>1,000,000</b></td></tr>
+      </table>
+    </div>
+    <div>
+      <ul>
+        <li>16k Byte-Level BPE tokenizer.</li>
+        <li>Max length 64 tokens.</li>
+        <li>Same splits + tokenizer for every model — no leakage.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section>
+  <h2>Four Models of Increasing Power</h2>
+  <table>
+    <tr><th>#</th><th>Model</th><th>What it adds</th></tr>
+    <tr><td>1</td><td>Bag-of-Words (TF-IDF)</td><td>Baseline — only <em>detects</em> errors</td></tr>
+    <tr><td>2</td><td>LSTM encoder–decoder</td><td>First corrector; fixed-size bottleneck</td></tr>
+    <tr><td>3</td><td>LSTM + Bahdanau attention</td><td>Decoder re-queries the full source</td></tr>
+    <tr><td>4</td><td>Transformer</td><td>Self-attention; no recurrence</td></tr>
+  </table>
+  <p class="small">Model 1 <em>detects</em>. Models 2–4 <em>correct</em>.</p>
+</section>
+
+<!-- 5 -->
+<section>
+  <h2>Model 1 — Bag-of-Words Baseline</h2>
+  <ul>
+    <li>Each pair → two samples: corrupted = ungrammatical (0), clean = grammatical (1).</li>
+    <li>Features: TF-IDF, unigrams + bigrams, 50k vocab (fit on train only).</li>
+    <li>Classifiers: Logistic Regression &amp; Linear SVM.</li>
+  </ul>
+  <div class="box">
+    <b>Result:</b> ~<b>62%</b> detection accuracy — barely above 50% chance.
+    Surface word statistics cannot solve GEC → need seq2seq.
+  </div>
+</section>
+
+<!-- 6 -->
+<section>
+  <h2>Model 2 — LSTM Encoder–Decoder</h2>
+  <div class="cols">
+    <div>
+      <ul>
+        <li>BiLSTM encoder compresses input into <b>one</b> 512-dim state.</li>
+        <li>LSTM decoder generates token by token.</li>
+        <li>Teacher forcing 1.0→0.5; 19.55M params; 3 epochs.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <b>The bottleneck:</b> after step 1 the decoder never "sees" the source
+      again — everything squeezed into 512 numbers.
+    </div>
+  </div>
+  <p>Test GLEU <b>0.213</b> (greedy) — weakest corrector.</p>
+</section>
+
+<!-- 7 -->
+<section>
+  <h2>Model 3 — LSTM + Bahdanau Attention</h2>
+  <p>Keep <em>all</em> encoder states; the decoder attends to them every step.</p>
+  <p class="small">score(s,h) = vᵀ·tanh(W·s + W·h) &nbsp;→&nbsp; α = softmax(score)
+     &nbsp;→&nbsp; context = Σ αᵢ·hᵢ</p>
+  <ul>
+    <li>Removes the bottleneck; alignment weights are interpretable.</li>
+    <li>Padding masked with −∞ before softmax. 29.06M params.</li>
+  </ul>
+  <div class="box">
+    <b>The decisive jump:</b> GLEU 0.213 → <b>0.599</b> (+0.386). Attention matters most.
+  </div>
+</section>
+
+<!-- 8 -->
+<section>
+  <h2>Model 4 — Transformer</h2>
+  <div class="cols">
+    <div>
+      <ul>
+        <li>No recurrence — self-attention only.</li>
+        <li>d_model 256, 8 heads, 3+3 layers, FFN 512.</li>
+        <li>Sinusoidal positional encoding; causal decoder mask.</li>
+        <li>Label smoothing 0.1; warmup LR; weight tying.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <b>Smallest &amp; strongest:</b> only <b>8.05M</b> params (3.6× fewer than
+      Model 3). Best validation GLEU <b>0.613</b>.
+    </div>
+  </div>
+  <p class="small">Self-attention: every token directly attends to every other —
+     O(1) path length, fully parallel.</p>
+</section>
+
+<!-- 9 -->
+<section>
+  <h2>Comparative Results — Test Set</h2>
+  <table>
+    <tr><th>Model</th><th>Decoding</th><th>Params</th><th>EM</th><th>GLEU</th></tr>
+    <tr><td>LSTM (no attention)</td><td>greedy</td><td>19.55M</td><td>≈0.008</td><td>0.213</td></tr>
+    <tr><td>LSTM (no attention)</td><td>beam-4</td><td>19.55M</td><td>—</td><td>0.256</td></tr>
+    <tr><td>LSTM + Bahdanau</td><td>greedy</td><td>29.06M</td><td>0.024</td><td>0.599</td></tr>
+    <tr><td>LSTM + Bahdanau</td><td>beam-4</td><td>29.06M</td><td>0.026</td><td><b>0.618</b></td></tr>
+    <tr><td>Transformer</td><td>greedy</td><td>8.05M</td><td>0.022</td><td><b>0.618</b></td></tr>
+    <tr><td>Transformer</td><td>beam-4</td><td>8.05M</td><td>0.020</td><td><b>0.618</b></td></tr>
+  </table>
+  <ul class="small">
+    <li>Beam search helps the LSTM, not the (well-calibrated) Transformer.</li>
+    <li>Transformer ties Model 3 on GLEU with 3.6× fewer parameters.</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section>
+  <h2>Attention Is Interpretable</h2>
+  <div class="cols">
+    <div>
+      <img src="../report/figures/attn_3.png" height="340">
+      <p class="small">Bahdanau decoder alignment</p>
+    </div>
+    <div>
+      <img src="../evaluation/phase5_transformer/enc_self_attn_3.png" height="340">
+      <p class="small">Transformer encoder self-attention</p>
+    </div>
+  </div>
+  <p class="small">Bright cells = which source token the model focuses on.</p>
+</section>
+
+<!-- 11 -->
+<section>
+  <h2>Behaviour by Sentence Length</h2>
+  <img src="../report/figures/length_bucketed_compare.png" height="380">
+  <p class="small">All models do best on short sentences; the bottleneck LSTM
+     degrades fastest as sentences get longer.</p>
+</section>
+
+<!-- 12 -->
+<section>
+  <h2>Grammar-Rule Analysis of Outputs</h2>
+  <p><b>Learned well</b> (local syntax):</p>
+  <ul class="small">
+    <li>Subject–verb agreement: <em>"What are this job"</em> → <em>"What is this job"</em></li>
+    <li>Articles: <em>"Why new record"</em> → <em>"Why the new record"</em></li>
+    <li>Verb tense, punctuation, spacing.</li>
+  </ul>
+  <p><b>Still hard:</b></p>
+  <ul class="small">
+    <li>Long-range / semantic edits; rare-word spelling (hallucination).</li>
+    <li>Dominant failure = <em>under-correction</em> — copying the source unchanged.</li>
+  </ul>
+</section>
+
+<!-- 13 -->
+<section>
+  <h2>Final Challenge — Dataset Quality</h2>
+  <p>Why does <b>every</b> model score only ~2% exact match?</p>
+  <div class="box">
+    <b>Reference quality is the ceiling — not model capacity</b><br><br>
+    <b>1. References are paraphrases:</b> <em>"informed"→"suggest"</em>,
+       <em>"startups"→"start-ups"</em> — not grammar errors.<br>
+    <b>2. References can be noisy:</b> target <em>"no brain worky"</em> — not a word.<br>
+    <b>3. Many valid corrections exist;</b> EM credits exactly one.
+  </div>
+  <p class="small">→ Report GLEU / F0.5, not EM. Cleaner data helps more than a bigger model.</p>
+</section>
+
+<!-- 14 -->
+<section>
+  <h2>Conclusion</h2>
+  <ul>
+    <li><b>BoW</b> detects grammaticality at ~62% — cannot correct.</li>
+    <li><b>LSTM</b> corrects but is limited by the bottleneck (GLEU 0.213).</li>
+    <li><b>Bahdanau attention</b> is the decisive jump (GLEU 0.599).</li>
+    <li><b>Transformer</b> ties on GLEU (0.618) with 3.6× fewer params,
+        best validation GLEU (0.613).</li>
+  </ul>
+  <div class="box">
+    <b>Key insight:</b> the binding constraint is <b>dataset quality</b>, not
+    architecture — synthetic C4_200M references are often paraphrases or noise.
+  </div>
+</section>
+
+<!-- 15 -->
+<section>
+  <h1>Thank You</h1>
+  <p>Questions?</p>
+</section>
+
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({hash:true, slideNumber:'c/t', transition:'slide'});
+</script>
+</body>
+</html>

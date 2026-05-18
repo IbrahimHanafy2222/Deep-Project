@@ -1,3 +1,21 @@
+# Project-specific: internal explainer (not part of submission)
+report/DEEP_LEARNING_EXPLAINER.md
+
+# LaTeX build artifacts
+*.aux
+*.lof
+*.lot
+*.out
+*.toc
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
