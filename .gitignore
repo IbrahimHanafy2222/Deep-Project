@@ -1,5 +1,6 @@
 # Project-specific: internal explainer (not part of submission)
 report/DEEP_LEARNING_EXPLAINER.md
+report/report1.tex
 
 # LaTeX build artifacts
 *.aux
